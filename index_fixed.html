@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PV Tambola Housie</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--ink:#172033;--muted:#667085;--ok:#16834b;--danger:#c93636;--accent:#4f46e5}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Arial;background:var(--bg);color:var(--ink)}
+header{background:var(--ink);color:#fff;padding:14px 18px;position:sticky;top:0;z-index:5}
+main{max-width:1150px;margin:auto;padding:14px}.card{background:var(--card);padding:16px;border-radius:16px;margin:12px 0;box-shadow:0 4px 18px #00000010}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+input,select,button{font:inherit;padding:11px;border-radius:10px;border:1px solid #d0d5dd}button{background:var(--ink);color:#fff;border:0;cursor:pointer}button.secondary{background:#e9ecf4;color:var(--ink)}button.ok{background:var(--ok)}button.danger{background:var(--danger)}
+.small{font-size:13px}.muted{color:var(--muted)}.hidden{display:none!important}.pill{display:inline-block;padding:5px 9px;border-radius:999px;background:#eef0f6;margin:3px}.sold{background:#fff0f0;color:var(--danger)}.free{background:#ecfdf3;color:var(--ok)}
+#currentNumber{font-size:70px;font-weight:900;text-align:center;margin:8px}.history{display:flex;flex-wrap:wrap;gap:5px}.ball{width:38px;height:38px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:#eef0f6;font-weight:700}.ball.current{background:var(--accent);color:#fff}
+.ticket{border:2px solid #202020;border-radius:8px;padding:4px;margin:9px 0;display:grid;grid-template-columns:repeat(9,1fr);gap:3px;background:#111}.cell{min-height:45px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;border-radius:3px}.cell.blank{background:#f8f8f8}.cell.hit{background:#26a65b;color:#fff}
+.tickets-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.ticketWrap{min-width:0}.ticket{width:100%}@media(max-width:700px){.tickets-grid{grid-template-columns:1fr}.cell{min-height:42px;font-size:16px}}
+table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid #eee;text-align:left;font-size:14px}
+.notice{padding:10px;border-radius:10px;background:#fff7d6}.error{background:#fff0f0;color:#9b1c1c}.success{background:#ecfdf3;color:#166534}
+</style>
+</head>
+<body>
+<header><b>🎟️ PV Tambola Housie</b><span id="status" style="float:right;font-size:12px"></span></header>
+<main>
+
+<section id="setup" class="card">
+<h2>Connecting to PV Tambola Housie…</h2>
+<p class="muted">Firebase configuration is already included in this package.</p>
+</section>
+
+<section id="app" class="hidden">
+<div class="card">
+<button onclick="showView('player')">Player</button>
+<button onclick="showView('admin')">Admin</button>
+<button class="secondary" onclick="logout()">Logout</button>
+</div>
+
+<section id="playerView">
+<div id="playerLoginCard" class="card">
+<h2>👤 Player Login</h2>
+<p class="muted">Player apne Email aur Password se login kare.</p>
+<div class="grid">
+<label>Email<br><input id="playerEmail" type="email" autocomplete="email" placeholder="your email"></label>
+<label>Password<br><input id="playerPassword" type="password" autocomplete="current-password" placeholder="password"></label>
+</div>
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+<button onclick="playerLogin()">Login</button>
+<button class="secondary" onclick="createPlayerAccount()">Create Account</button>
+<button class="secondary" onclick="resetPlayerPassword()">Forgot Password</button>
+</div>
+<div id="playerLoginMsg" class="small"></div>
+</div>
+
+<div id="playerBookingArea" class="hidden">
+<div class="card">
+<h2>Book Your Housie Sheet</h2>
+<div class="grid">
+<label>Name<br><input id="pname" placeholder="Your name"></label>
+<label>WhatsApp<br><input id="pwa" placeholder="10 digit number"></label>
+<label>Sheet<br><select id="sheetSelect"></select></label>
+</div>
+<p>Today's price: <b id="todayPrice">₹—</b></p>
+<button onclick="createBooking()">Book Sheet & Send WhatsApp</button>
+<div id="playerMsg" class="small"></div>
+</div>
+<div id="myBookingCard" class="card hidden">
+<h2>My Verified Sheet</h2>
+<div id="myBookingInfo"></div>
+<div id="playerNumber" style="text-align:center;font-weight:800">Waiting for game…</div>
+<div id="playerTickets" class="tickets-grid"></div>
+<div class="card" style="background:#fafafa">
+<h3>Claims</h3>
+<button onclick="sendClaim('Early 5')">Early 5</button>
+<button onclick="sendClaim('Top Line')">Top Line</button>
+<button onclick="sendClaim('Middle Line')">Middle Line</button>
+<button onclick="sendClaim('Bottom Line')">Bottom Line</button>
+<button onclick="sendClaim('Corners')">Corners</button>
+<button onclick="sendClaim('Sheet Corners')">Sheet Corners</button>
+<button onclick="sendClaim('Full House')">Full House</button>
+<div id="claimMsg" class="small"></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+
+<section id="adminView" class="hidden">
+<div id="adminLogin" class="card">
+<h2>Admin Login</h2>
+<p class="muted">Use the Firebase Email/Password account you created for the admin.</p>
+<div class="grid"><input id="aemail" type="email" placeholder="Admin email"><input id="apass" type="password" placeholder="Password"></div>
+<p><button onclick="adminLogin()">Login</button></p><div id="adminMsg" class="small"></div>
+</div>
+
+<div id="adminPanel" class="hidden">
+<div class="card">
+<h2>⚙️ Daily Settings</h2>
+<div class="grid">
+<label>Today's sheet price<br><input id="adminPrice" type="number" min="0"></label>
+<label>WhatsApp number<br><input id="adminWa" value="7650075757"></label>
+<label>Game start date & time<br><input id="gameStartAt" type="datetime-local"></label>
+<label>Auto number interval (seconds)<br><input id="gameInterval" type="number" min="5" max="3600" value="20"></label>
+</div>
+<p><button class="ok" onclick="saveSettings()">Save Settings</button></p>
+<div id="scheduleMsg" class="small muted"></div>
+</div>
+
+<div class="card">
+<h2>🎲 Live Game</h2>
+<div id="gameState" class="notice" style="text-align:center">Game not started</div>
+<div id="currentNumber">—</div>
+<div style="text-align:center;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+<button class="ok" onclick="startAutoGame()">▶ START AUTO GAME</button>
+<button class="secondary" onclick="stopAutoGame()">⏸ STOP AUTO GAME</button>
+<button class="secondary" onclick="undoNumber()">Undo</button>
+<button class="danger" onclick="resetGame()">Reset Game</button>
+</div>
+<p class="small muted" style="text-align:center">Numbers 1–90 automatically random generate honge. Same number dobara nahi aayega.</p>
+<h3>Called Numbers</h3><div id="adminHistory" class="history"></div>
+</div>
+
+<div class="card">
+<h2>📋 Booking & Payment Verification</h2>
+<div style="overflow:auto"><table><thead><tr><th>Sheet</th><th>Player</th><th>WhatsApp</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead><tbody id="bookingTable"></tbody></table></div>
+</div>
+
+<div class="card">
+<h2>🔔 Claims</h2>
+<div style="overflow:auto"><table><thead><tr><th>Player</th><th>Sheet</th><th>Claim</th><th>Status</th><th>Action</th></tr></thead><tbody id="claimTable"></tbody></table></div>
+</div>
+
+<div class="card">
+<h2>📤 Update Excel Sheets</h2>
+<p class="muted">Aap jab 200 Excel files update karein, ZIP/Excel yahan se upload karke latest ticket data browser mein replace kar sakte hain. For all players, upload the generated data/sheets.json to your hosting after export.</p>
+<input id="excelUpload" type="file" accept=".xlsx,.xls,.zip">
+<button onclick="importExcel()">Import</button>
+<div id="importMsg" class="small"></div>
+</div>
+</div>
+</section>
+</section>
+</main>
+
+<script>
+
+let fb=null,auth=null,db=null,user=null,admin=false;
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBYp_-9fJywCGDynhYKa6yUhUVcHE6opU8",
+  authDomain: "pv-tambola-housie.firebaseapp.com",
+  databaseURL: "https://pv-tambola-housie-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "pv-tambola-housie",
+  storageBucket: "pv-tambola-housie.firebasestorage.app",
+  messagingSenderId: "108633707236",
+  appId: "1:108633707236:web:9e64f88840b3da292252f1"
+};
+
+let localSheets=[],myBookingId=localStorage.getItem('pvBookingId')||null;
+const ADMIN_UID_KEY='pvAdminUid';
+
+function $(id){return document.getElementById(id)}
+function setMsg(id,t,cls=''){ $(id).textContent=t; $(id).className='small '+cls }
+function saveFirebase(){ location.reload(); }
+async function start(){
+ $('setup').classList.add('hidden'); $('app').classList.remove('hidden');
+ try{
+  const cfg=FIREBASE_CONFIG;
+  if(!firebase.apps.length)firebase.initializeApp(cfg);
+  auth=firebase.auth(); db=firebase.database();
+  if(!auth.currentUser) await auth.signInAnonymously();
+  user=auth.currentUser; $('status').textContent='Online';
+  updatePlayerLoginUI();
+  await loadSheets(); listenSettings(); listenGame(); listenMyBooking(); listenAdminData();
+  }catch(e){$('setup').classList.remove('hidden'); $('app').classList.add('hidden'); $('setup').innerHTML='<h2>Firebase connection failed</h2><p class="error">'+esc(e.message)+'</p><p>Check that Authentication and Realtime Database are enabled.</p>'}
+}
+
+function isEmailPlayer(){
+  return !!(user && !user.isAnonymous && user.email);
+}
+
+function updatePlayerLoginUI(){
+  const logged=isEmailPlayer();
+  $('playerBookingArea').classList.toggle('hidden',!logged);
+  $('playerLoginCard').classList.toggle('hidden',logged);
+
+  if(logged){
+    $('playerLoginMsg').textContent='Login successful. Aapki verified sheet yahan dikhegi.';
+    $('playerLoginMsg').className='small success';
+    $('pname').value=user.displayName||'';
+    findPlayerBooking();
+  }
+}
+
+async function playerLogin(){
+  try{
+    const email=$('playerEmail').value.trim();
+    const password=$('playerPassword').value;
+    if(!email||!password)return setMsg('playerLoginMsg','Email aur password dono bhariye.','error');
+    setMsg('playerLoginMsg','Login ho raha hai…');
+    const result=await auth.signInWithEmailAndPassword(email,password);
+    user=result.user;
+    updatePlayerLoginUI();
+    await loadSheets();
+    listenMyBooking();
+    setMsg('playerLoginMsg','Login successful.','success');
+  }catch(e){
+    setMsg('playerLoginMsg',e.message||'Login failed. Email/password check karein.','error');
+  }
+}
+
+async function createPlayerAccount(){
+  try{
+    const email=$('playerEmail').value.trim();
+    const password=$('playerPassword').value;
+    if(!email||!password)return setMsg('playerLoginMsg','Email aur password dono bhariye.','error');
+    if(password.length<6)return setMsg('playerLoginMsg','Password kam se kam 6 characters ka hona chahiye.','error');
+    setMsg('playerLoginMsg','Account create ho raha hai…');
+    const result=await auth.createUserWithEmailAndPassword(email,password);
+    user=result.user;
+    updatePlayerLoginUI();
+    await loadSheets();
+    listenMyBooking();
+    setMsg('playerLoginMsg','Account create ho gaya aur login bhi ho gaya.','success');
+  }catch(e){
+    setMsg('playerLoginMsg',e.message||'Account create nahi hua.','error');
+  }
+}
+
+async function resetPlayerPassword(){
+  try{
+    const email=$('playerEmail').value.trim();
+    if(!email)return setMsg('playerLoginMsg','Pehle apna email likhiye.','error');
+    await auth.sendPasswordResetEmail(email);
+    setMsg('playerLoginMsg','Password reset email bhej diya gaya hai. Inbox/spam check karein.','success');
+  }catch(e){
+    setMsg('playerLoginMsg',e.message||'Password reset nahi ho paya.','error');
+  }
+}
+
+async function findPlayerBooking(){
+  if(!user || user.isAnonymous)return;
+  try{
+    const snap=await db.ref('bookings').orderByChild('uid').equalTo(user.uid).once('value');
+    const data=snap.val()||{};
+    const rows=Object.values(data).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+    if(rows.length){
+      myBookingId=rows[0].id;
+      localStorage.setItem('pvBookingId',myBookingId);
+      window.myB=rows[0];
+      renderMyBooking(rows[0]);
+    }
+  }catch(e){
+    // If the database rules do not allow a uid query, the local booking ID still works.
+    if(localStorage.getItem('pvBookingId')) listenMyBooking();
+  }
+}
+
+function renderMyBooking(b){
+  if(!b)return;
+  if(b.status==='verified'){
+    $('myBookingCard').classList.remove('hidden');
+    $('myBookingInfo').innerHTML=`<b>Sheet ${b.sheetNo}</b> — ${esc(b.name)}<br><span class="muted">Booking ID: ${esc(b.id||myBookingId||'')}</span>`;
+    renderMyTickets(awaitGame);
+  }else{
+    $('myBookingCard').classList.add('hidden');
+  }
+}
+
+async function loadSheets(){
+ let data=null,lastErr=null;
+ for(const path of ['data/sheets.json','sheets.json']){
+  try{const r=await fetch(path,{cache:'no-store'});if(r.ok){data=await r.json();break;}}
+  catch(e){lastErr=e}
+ }
+ if(!data)throw lastErr||new Error('sheets.json nahi mila.');
+ if(!Array.isArray(data))data=data.sheets||[];
+ localSheets=data.map((x,i)=>({...x,sheetNo:Number(x.sheetNo??x.sheet??(i+1)),tickets:Array.isArray(x.tickets)?x.tickets:[]})).sort((a,b)=>a.sheetNo-b.sheetNo);
+ const snap=await db.ref('bookingBySheet').once('value');const b=snap.val()||{};
+ const s=$('sheetSelect');s.innerHTML='';
+ localSheets.forEach(x=>{
+  const o=document.createElement('option');o.value=x.sheetNo;
+  const rec=b[x.sheetNo];o.textContent='Sheet '+String(x.sheetNo).padStart(3,'0')+(rec?' — BOOKED':'');o.disabled=!!rec;s.appendChild(o);
+ });
+ if(!localSheets.length)throw new Error('sheets.json mein koi sheet nahi mili.');
+}
+let autoTimer=null,autoBusy=false,scheduleTimer=null;
+function toDateTimeLocal(ms){if(!ms)return '';const d=new Date(ms-new Date().getTimezoneOffset()*60000);return d.toISOString().slice(0,16)}
+function listenSettings(){
+ db.ref('settings').on('value',s=>{
+  const x=s.val()||{};
+  $('todayPrice').textContent=x.price?'₹'+x.price:'Not set';$('adminPrice').value=x.price||'';$('adminWa').value=x.wa||'7650075757';
+  if(x.gameStartAt)$('gameStartAt').value=toDateTimeLocal(Number(x.gameStartAt));
+  $('gameInterval').value=Number(x.gameIntervalSec||20);scheduleAutoGame(x);
+ });
+}
+function listenGame(){db.ref('game').on('value',s=>{const g=s.val()||{};renderNumbers(g.called||[]);const active=!!g.autoEnabled;$('gameState').textContent=active?'🟢 AUTO GAME RUNNING':'⏸ Game stopped';$('gameState').className='notice '+(active?'success':'')})}
+function renderNumbers(a){const cur=a.length?a[a.length-1]:'—';$('currentNumber').textContent=cur;$('playerNumber').textContent=cur==='—'?'Waiting for game…':'Current Number: '+cur;$('adminHistory').innerHTML=a.map((n,i)=>`<span class="ball ${i===a.length-1?'current':''}">${n}</span>`).join('');renderMyTickets(a)}
+let awaitGame=[];
+function normalizeTicket(t){
+ let rows=[];
+ if(Array.isArray(t)&&t.length===3&&t.every(r=>Array.isArray(r)))rows=t;
+ else if(Array.isArray(t))rows=[t.slice(0,9),t.slice(9,18),t.slice(18,27)];
+ else rows=[[],[],[]];
+ return [0,1,2].map(r=>Array.from({length:9},(_,c)=>{
+  const v=rows[r]?.[c];if(v===null||v===undefined||v==='')return null;
+  const n=Number(v);return Number.isFinite(n)&&n>=1&&n<=90?n:null;
+ }));
+}
+function renderMyTickets(called){
+ awaitGame=called;const bcache=window.myB;if(!bcache||bcache.status!=='verified')return;
+ const sh=localSheets.find(x=>x.sheetNo===Number(bcache.sheetNo));if(!sh)return;
+ const tickets=Array.isArray(sh.tickets)?sh.tickets:[];
+ $('playerTickets').innerHTML=tickets.map((t,i)=>`<div class="ticketWrap"><b>Ticket ${i+1}</b>${ticketHTML(t,called)}</div>`).join('');
+ if(!tickets.length)$('playerTickets').innerHTML='<div class="notice error">Is sheet ke tickets data mein nahi mile. Admin ko sheets.json check karna hoga.</div>';
+}
+function ticketHTML(t,called){const rows=normalizeTicket(t);return '<div class="ticket">'+rows.flat().map(v=>`<div class="cell ${v==null?'blank':(called.includes(Number(v))?'hit':'')}">${v==null?'':v}</div>`).join('')+'</div>'}
+function showView(v){$('playerView').classList.toggle('hidden',v!=='player');$('adminView').classList.toggle('hidden',v!=='admin')}
+async function adminLogin(){
+ try{await auth.signInWithEmailAndPassword($('aemail').value,$('apass').value);admin=true;showAdminPanel();listenAdminData()}
+ catch(e){setMsg('adminMsg',e.message,'error')}
+}
+async function showAdminPanel(){ $('adminLogin').classList.add('hidden');$('adminPanel').classList.remove('hidden'); const s=(await db.ref('settings').once('value')).val()||{}; scheduleAutoGame(s);}
+function isAdmin(){return admin}
+function saveSettings(){
+ const raw=$('gameStartAt').value,startAt=raw?new Date(raw).getTime():0;
+ const intervalSec=Math.max(5,Math.min(3600,Number($('gameInterval').value||20)));
+ db.ref('settings').set({price:Number($('adminPrice').value||0),wa:$('adminWa').value.trim()||'7650075757',gameStartAt:startAt,gameIntervalSec:intervalSec}).then(()=>{
+  setMsg('scheduleMsg',startAt?'Settings saved. Game '+new Date(startAt).toLocaleString()+' par start hoga.':'Settings saved.','success');
+  scheduleAutoGame({gameStartAt:startAt,gameIntervalSec:intervalSec});
+ });
+}
+async function generateNextNumber(){
+ if(!isAdmin()||autoBusy)return;autoBusy=true;
+ try{
+  const ref=db.ref('game/called');
+  const result=await ref.transaction(a=>{
+   a=Array.isArray(a)?a:[];if(a.length>=90)return a;
+   const unused=[];for(let n=1;n<=90;n++)if(!a.includes(n))unused.push(n);
+   return a.concat(unused[Math.floor(Math.random()*unused.length)]);
+  });
+  if(result.committed&&Array.isArray(result.snapshot.val())&&result.snapshot.val().length>=90)await db.ref('game').update({autoEnabled:false,finishedAt:firebase.database.ServerValue.TIMESTAMP});
+ }catch(e){console.error(e)}finally{autoBusy=false}
+}
+async function startAutoGame(){
+ if(!isAdmin())return alert('Admin login required.');
+ const set=(await db.ref('settings').once('value')).val()||{},startAt=Number(set.gameStartAt||0);
+ const s=await db.ref('game/called').once('value'),called=Array.isArray(s.val())?s.val():[];
+ await db.ref('game').update({called,autoEnabled:true,startedAt:firebase.database.ServerValue.TIMESTAMP});
+ setMsg('scheduleMsg',startAt&&Date.now()<startAt?'Game scheduled hai: '+new Date(startAt).toLocaleString():'Auto game started.','success');
+ scheduleAutoGame({...set,gameStartAt:startAt});
+}
+async function stopAutoGame(){
+ if(!isAdmin())return;await db.ref('game/autoEnabled').set(false);
+ if(autoTimer){clearInterval(autoTimer);autoTimer=null}if(scheduleTimer){clearInterval(scheduleTimer);scheduleTimer=null}
+ setMsg('scheduleMsg','Auto game stopped.');
+}
+function scheduleAutoGame(settings){
+ if(scheduleTimer){clearInterval(scheduleTimer);scheduleTimer=null}if(autoTimer){clearInterval(autoTimer);autoTimer=null}
+ const startAt=Number(settings.gameStartAt||0),interval=Math.max(5,Math.min(3600,Number(settings.gameIntervalSec||20)))*1000;
+ const tick=async()=>{const g=(await db.ref('game').once('value')).val()||{};if(!g.autoEnabled)return;if(startAt&&Date.now()<startAt)return;if(!autoTimer){await generateNextNumber();autoTimer=setInterval(generateNextNumber,interval)}};
+ tick();scheduleTimer=setInterval(tick,1000);
+}
+async function undoNumber(){if(!isAdmin())return;const s=await db.ref('game/called').once('value'),a=Array.isArray(s.val())?s.val():[];a.pop();await db.ref('game/called').set(a)}
+async function resetGame(){if(isAdmin()&&confirm('Called numbers reset karein?')){await db.ref('game').set({called:[],autoEnabled:false});if(autoTimer){clearInterval(autoTimer);autoTimer=null}}}
+function listenAdminData(){
+ db.ref('bookings').on('value',s=>{const b=s.val()||{};window.bookingsCache=b;$('bookingTable').innerHTML=Object.values(b).sort((x,y)=>(x.createdAt||0)-(y.createdAt||0)).map(r=>`<tr><td>${r.sheetNo}</td><td>${esc(r.name)}</td><td>${esc(r.wa)}</td><td>₹${r.amount}</td><td>${r.status}</td><td>${r.status==='pending'?`<button class="ok" onclick="verifyBooking('${r.id}')">Verify Payment</button>`:`<button class="danger" onclick="revokeBooking('${r.id}')">Revoke</button>`}</td></tr>`).join('')});
+ db.ref('claims').on('value',s=>{const c=s.val()||{};$('claimTable').innerHTML=Object.values(c).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).map(r=>`<tr><td>${esc(r.name)}</td><td>${r.sheetNo}</td><td>${esc(r.type)}</td><td>${r.status}</td><td>${r.status==='pending'?`<button class="ok" onclick="verifyClaim('${r.id}')">Verify</button> <button class="danger" onclick="rejectClaim('${r.id}')">Reject</button>`:''}</td></tr>`).join('')});
+}
+async function verifyBooking(id){if(!isAdmin())return;const b=(await db.ref('bookings/'+id).once('value')).val();if(!b)return;await db.ref('bookings/'+id).update({status:'verified',verifiedAt:firebase.database.ServerValue.TIMESTAMP}) ;loadSheets()}
+async function revokeBooking(id){
+ if(!isAdmin())return;const b=(await db.ref('bookings/'+id).once('value')).val();if(!b)return;
+ await db.ref('bookings/'+id).update({status:'revoked'});
+ const map=(await db.ref('bookingBySheet/'+b.sheetNo).once('value')).val();if(map===id)await db.ref('bookingBySheet/'+b.sheetNo).remove();
+ loadSheets();
+}
+async function sendClaim(type){
+ if(!myBookingId)return alert('Booking not found.');
+ const b=window.myB;if(!b||b.status!=='verified')return alert('Payment verification ke baad claim kar sakte hain.');
+ const id=db.ref('claims').push().key;
+ await db.ref('claims/'+id).set({id,bookingId:myBookingId,uid:user.uid,name:b.name,sheetNo:b.sheetNo,type,status:'pending',createdAt:firebase.database.ServerValue.TIMESTAMP});
+ $('claimMsg').textContent=type+' claim admin ko bhej diya gaya.';
+}
+async function verifyClaim(id){if(!isAdmin())return;db.ref('claims/'+id).update({status:'verified',verifiedAt:firebase.database.ServerValue.TIMESTAMP})}
+async function rejectClaim(id){if(!isAdmin())return;db.ref('claims/'+id).update({status:'rejected'})}
+async function importExcel(){
+ const f=$('excelUpload').files[0];if(!f)return;
+ setMsg('importMsg','Importing…');
+ try{
+  if(f.name.toLowerCase().endsWith('.zip'))return setMsg('importMsg','ZIP import ke liye browser-side ZIP parser add karna hoga; फिलहाल .xlsx files import karein.','error');
+  const data=await f.arrayBuffer(),wb=XLSX.read(data,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});const nums=rows.map(r=>r.slice(0,9).map(v=>Number.isInteger(v)&&v>=1&&v<=90?v:null));
+  const tickets=[];for(let i=1;i<nums.length;i+=4){if(nums[i]&&nums[i+1]&&nums[i+2])tickets.push([nums[i],nums[i+1],nums[i+2]])}
+  setMsg('importMsg','Imported '+tickets.length+' tickets. For the full 200-sheet replacement, replace data/sheets.json and redeploy.','success');
+ }catch(e){setMsg('importMsg',e.message,'error')}
+}
+async function logout(){try{await auth.signOut()}catch(e){} localStorage.removeItem('pvBookingId'); location.reload()}
+dbReady=false;
+authState=false;
+// Firebase auth listener must be attached only after auth is initialized inside start().
+start();
+
+</script>
+</body></html>
